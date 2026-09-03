@@ -5,8 +5,7 @@
  */
 import './polyfill.js';
 
-import type {Channel} from './browser.js';
-import {ensureBrowserConnected, ensureBrowserLaunched, resolveAutoConnectTarget} from './browser.js';
+import {ensureBrowserConnected, resolveAutoConnectTarget} from './browser.js';
 import {parseArguments} from './cli.js';
 import {features} from './features.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
@@ -25,12 +24,13 @@ import * as jshookCollectorTools from './tools/collector.js';
 import * as consoleTools from './tools/console.js';
 import * as debuggerTools from './tools/debugger.js';
 import * as jshookDomTools from './tools/dom.js';
-import * as jshookHookTools from './tools/hook.js';
 import * as frameTools from './tools/frames.js';
+import * as jshookHookTools from './tools/hook.js';
 import * as networkTools from './tools/network.js';
 import * as jshookPageTools from './tools/page.js';
 import * as pagesTools from './tools/pages.js';
 import * as jshookRebuildTools from './tools/rebuild.js';
+import {getJSHookRuntime} from './tools/runtime.js';
 import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
 import * as jshookStealthTools from './tools/stealth.js';
@@ -41,7 +41,6 @@ import * as websocketTools from './tools/websocket.js';
 import {ErrorCodes, formatError} from './utils/errors.js';
 import {TokenBudgetManager} from './utils/TokenBudgetManager.js';
 import {ToolExecutionScheduler} from './utils/ToolExecutionScheduler.js';
-import {getJSHookRuntime} from './tools/runtime.js';
 
 // If moved update release-please config
 // x-release-please-start-version
@@ -76,25 +75,14 @@ async function getContext(): Promise<McpContext> {
     !args.browserUrl && !args.wsEndpoint && args.autoConnect
       ? await resolveAutoConnectTarget()
       : undefined;
-  const browser =
-    args.browserUrl || args.wsEndpoint || autoConnectTarget
-      ? await ensureBrowserConnected({
-          browserURL: args.browserUrl ?? autoConnectTarget?.browserURL,
-          wsEndpoint: args.wsEndpoint ?? autoConnectTarget?.wsEndpoint,
-          wsHeaders: args.wsHeaders,
-          devtools,
-        })
-      : await ensureBrowserLaunched({
-          headless: args.headless,
-          executablePath: args.executablePath,
-          channel: args.channel as Channel,
-          isolated: args.isolated,
-          logFile,
-          viewport: args.viewport,
-          args: extraArgs,
-          acceptInsecureCerts: args.acceptInsecureCerts,
-          devtools,
-        });
+  if (!args.browserUrl && !args.wsEndpoint && !autoConnectTarget)
+    throw new Error('No browser connection target: provide --browserUrl, --wsEndpoint, or --autoConnect');
+  const browser = await ensureBrowserConnected({
+    browserURL: args.browserUrl ?? autoConnectTarget?.browserURL,
+    wsEndpoint: args.wsEndpoint ?? autoConnectTarget?.wsEndpoint,
+    wsHeaders: args.wsHeaders,
+    devtools,
+  });
 
   if (context?.browser !== browser) {
     context = await McpContext.from(browser, logger, {
